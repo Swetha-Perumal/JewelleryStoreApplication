@@ -31,21 +31,33 @@ public class CartServiceImpl implements CartService {
 
     
     @Override
-    public CartItem addItemToCart(Long cartId, Long productId, int quantity){
+    public CartItem addItemToCart(Long cartId, Long productId, int quantity) {
         Cart cart = cartRepository.findById(cartId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found with ID: " + cartId));
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
+        
         if (product.getQuantity() < quantity) {
             throw new ResourceNotFoundException("Not enough stock available for product: " + product.getProductName());
         }
-        // Create new CartItem
-        CartItem cartItem = new CartItem();
-        cartItem.setCart(cart);
-        cartItem.setProduct(product);
-        cartItem.setQuantity(quantity);
-        cartItem.setTotalPrice(product.getPrice() * quantity);
-        // Save CartItem
+        
+        Optional<CartItem> existingCartItem = cart.getCartItems().stream()
+                .filter(item -> item.getProduct().getProductId().equals(productId))
+                .findFirst();
+ 
+        CartItem cartItem;
+        if (existingCartItem.isPresent()) {
+            cartItem = existingCartItem.get();
+            cartItem.setQuantity(cartItem.getQuantity() + quantity);
+            cartItem.setTotalPrice(cartItem.getQuantity() * product.getPrice());
+        } else {
+            cartItem = new CartItem();
+            cartItem.setCart(cart);
+            cartItem.setProduct(product);
+            cartItem.setQuantity(quantity);
+            cartItem.setTotalPrice(product.getPrice() * quantity);
+            cart.getCartItems().add(cartItem);
+        }
         cartItemsRepository.save(cartItem);
         return cartItem;
     }
